@@ -35,6 +35,7 @@ x64/
 
 Dependencies/
 
+<<<<<<< HEAD
 ARGUELLES_GLFW/x64/
 
 .vs/
@@ -43,3 +44,9 @@ ARGUELLES_GLFW/x64/
 .vs/ARGUELLES_GLFW/v17/.suo
 *.db
 *.ipch
+.vs/ARGUELLES_GLFW/v17/.suo
+.vs/ARGUELLES_GLFW/v17/Browse.VC.db
+.vs/ARGUELLES_GLFW/v17/ipch/AutoPCH/45f535ed3ba3a1/ARGUELLES_GLFW.ipch
+=======
+ARGUELLES_GLFW/x64/
+>>>>>>> parent of ef47e8d (gitignore)
