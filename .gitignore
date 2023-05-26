@@ -40,3 +40,6 @@ ARGUELLES_GLFW/x64/
 .vs/
 *.vsidx
 *.vsidx
+.vs/ARGUELLES_GLFW/v17/.suo
+*.db
+*.ipch
