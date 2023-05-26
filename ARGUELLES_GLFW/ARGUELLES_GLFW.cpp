@@ -2,6 +2,10 @@
 #include "GLFW/glfw3.h"
 #include "math.h"
 
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
+
 #define M_PI           3.14159265358979323846
 
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -151,17 +155,34 @@ int main(void)
     glBindVertexArray(0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
+    glm::mat4 identity_matrix = glm::mat4(1.0f);
+
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT);
 
-        unsigned int xLoc = glGetUniformLocation(shaderProgram, "x");
-        glUniform1f(xLoc, x_mod);
+        float x = 0.0;
+        float y = 0.0;
+        float z = 0.0;
+        float scale_x = 1.0;
+        float scale_y = 1.0;
+        float scale_z = 1.0;
+        float radians = 90.0;
+        float axis_x = 0.0;
+        float axis_y = 1.0;
+        float axis_z = 0.0;
 
-        unsigned int yLoc = glGetUniformLocation(shaderProgram, "y");
-        glUniform1f(yLoc, y_mod);
+        glm::mat4 transformation_matrix = glm::translate(identity_matrix, glm::vec3(x_mod,y_mod,z));
+
+        transformation_matrix = glm::scale(transformation_matrix, glm::vec3(scale_x,scale_y,scale_z));
+
+        transformation_matrix = glm::rotate(transformation_matrix, glm::radians(radians), glm::normalize(glm::vec3(axis_x, axis_y, axis_z)));
+
+        unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
+        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
+
 
         glUseProgram(shaderProgram);
         glBindVertexArray(VAO);
