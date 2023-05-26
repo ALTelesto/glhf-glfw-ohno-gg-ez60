@@ -38,3 +38,4 @@ Dependencies/
 ARGUELLES_GLFW/x64/
 
 .vs/
+*.vsidx
