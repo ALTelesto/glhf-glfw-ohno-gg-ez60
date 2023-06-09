@@ -36,15 +36,21 @@ x64/
 Dependencies/
 
 ARGUELLES_GLFW/x64/
+ARGUELLES_GLFW/Debug/
 
 .vs/
+ARGUELLES_GLFW/v17/
 *.vsidx
 *.vsidx
+*.sqlite
 .vs/ARGUELLES_GLFW/v17/.suo
 *.db
 *.ipch
 .vs/ARGUELLES_GLFW/v17/.suo
 .vs/ARGUELLES_GLFW/v17/Browse.VC.db
 .vs/ARGUELLES_GLFW/v17/ipch/AutoPCH/45f535ed3ba3a1/ARGUELLES_GLFW.ipch
+
+Debug/
+
 
 
