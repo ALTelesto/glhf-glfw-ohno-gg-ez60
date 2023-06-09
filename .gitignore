@@ -43,7 +43,8 @@ ARGUELLES_GLFW/v17/
 *.vsidx
 *.vsidx
 *.sqlite
-.vs/ARGUELLES_GLFW/v17/.suo
+*.suo
+*.wsuo
 *.db
 *.ipch
 .vs/ARGUELLES_GLFW/v17/.suo
