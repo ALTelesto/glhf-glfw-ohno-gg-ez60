@@ -150,6 +150,33 @@ int main(void)
         );
     }
 
+    //texture
+    std::vector<GLfloat> fullVertexData;
+    for (int i = 0; i < shape[0].mesh.indices.size(); i++) {
+        tinyobj::index_t vData = shape[0].mesh.indices[i];
+        //X
+        fullVertexData.push_back(
+            attributes.vertices[vData.vertex_index * 3]
+        );
+        //Y
+        fullVertexData.push_back(
+            attributes.vertices[vData.vertex_index * 3 + 1]
+        );
+        //Z
+        fullVertexData.push_back(
+            attributes.vertices[vData.vertex_index * 3 + 2]
+        );
+
+        //U
+        fullVertexData.push_back(
+            attributes.texcoords[vData.texcoord_index * 2]
+        );
+        //V
+        fullVertexData.push_back(
+            attributes.texcoords[vData.texcoord_index * 2 + 1]
+        );
+    }
+
     GLfloat UV[]{
         0.f, 2.f,
         0.f, 0.f,
@@ -181,6 +208,7 @@ int main(void)
     glGenerateMipmap(GL_TEXTURE_2D);
 
     stbi_image_free(tex_bytes);
+    //texture end
 
     GLfloat vertices[]{
         //  x    y     z
@@ -196,8 +224,8 @@ int main(void)
     GLuint VAO, VBO, EBO, VBO_UV;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
-    glGenBuffers(1, &VBO_UV);
-    glGenBuffers(1, &EBO);
+    //glGenBuffers(1, &VBO_UV);
+    //glGenBuffers(1, &EBO);
 
     //text
     glBindVertexArray(VAO);
@@ -205,8 +233,8 @@ int main(void)
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(
         GL_ARRAY_BUFFER,
-        sizeof(GLfloat) * attributes.vertices.size(),
-        &attributes.vertices[0],
+        sizeof(GLfloat) * fullVertexData.size(),
+        fullVertexData.data(),
         GL_STATIC_DRAW
     );
 
@@ -215,12 +243,27 @@ int main(void)
         3, //xyz
         GL_FLOAT,
         GL_FALSE,
-        3 * sizeof(GL_FLOAT),
+        //XYZ UV
+        5 * sizeof(GL_FLOAT),
         (void*)0
     );
+
+    GLintptr uvPtr = 3 * sizeof(float);
+    glVertexAttribPointer(
+        2,
+        2,
+        GL_FLOAT,
+        GL_FALSE,
+        //XYZ UV
+        5 * sizeof(GL_FLOAT),
+        (void*)uvPtr
+    );
+
     glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(2);
 
     //texture
+    /*
     glBindBuffer(GL_ARRAY_BUFFER, VBO_UV);
     glBufferData(GL_ARRAY_BUFFER,
                 sizeof(GLfloat) * (sizeof(UV) / sizeof(UV[0])),
@@ -228,8 +271,11 @@ int main(void)
                 GL_DYNAMIC_DRAW);
 
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(2);
+  
+    */
+    //texture end
 
+    /*
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(
         GL_ELEMENT_ARRAY_BUFFER,
@@ -237,10 +283,10 @@ int main(void)
         mesh_indices.data(),
         GL_STATIC_DRAW
     );
-
+    */
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     glm::mat4 identity_matrix = glm::mat4(1.0f);
 
@@ -330,12 +376,15 @@ int main(void)
         glUseProgram(shaderProgram);
         glBindVertexArray(VAO);
         //glDrawArrays(GL_TRIANGLES, 0, 3);
+        /*
         glDrawElements(
             GL_TRIANGLES, 
             mesh_indices.size(), 
             GL_UNSIGNED_INT, 
             0
         );
+        */
+        glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 5);
 
         /*
         float x, y, nx, ny;
