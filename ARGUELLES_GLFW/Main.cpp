@@ -16,12 +16,12 @@
 
 float x_mod = 0.0f;
 float y_mod = 0.0f;
-float z_mod = -5.0f;
+float z_mod = -10.0f;
 
 float rx_mod = 0.0f;
 float ry_mod = 0.0f;
 
-float scale_mod = 1.0f;
+float scale_mod = 0.17f;
 
 float fov_mod = 60.0f;
 
@@ -127,7 +127,7 @@ int main(void)
 
 
 
-    std::string path = "3D/myCube.obj";
+    std::string path = "3D/djSword.obj";
     std::vector<tinyobj::shape_t> shape;
     std::vector<tinyobj::material_t> material;
     std::string warning, error;
@@ -167,6 +167,16 @@ int main(void)
             attributes.vertices[vData.vertex_index * 3 + 2]
         );
 
+        fullVertexData.push_back(
+            attributes.normals[vData.normal_index * 3]
+        );
+        fullVertexData.push_back(
+            attributes.normals[vData.normal_index * 3 + 1]
+        );
+        fullVertexData.push_back(
+            attributes.normals[vData.normal_index * 3 + 2]
+        );
+
         //U
         fullVertexData.push_back(
             attributes.texcoords[vData.texcoord_index * 2]
@@ -175,6 +185,7 @@ int main(void)
         fullVertexData.push_back(
             attributes.texcoords[vData.texcoord_index * 2 + 1]
         );
+
     }
 
     GLfloat UV[]{
@@ -193,7 +204,7 @@ int main(void)
     int img_width, img_height, colorChannels;
 
     stbi_set_flip_vertically_on_load(true);
-    unsigned char* tex_bytes = stbi_load("3D/ayaya.png", &img_width, &img_height, &colorChannels, 0);
+    unsigned char* tex_bytes = stbi_load("3D/pikachu.jpg", &img_width, &img_height, &colorChannels, 0);
 
     GLuint texture;
 
@@ -203,23 +214,12 @@ int main(void)
 
     glBindTexture(GL_TEXTURE_2D, texture);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img_width, img_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, tex_bytes);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img_width, img_height, 0, GL_RGB, GL_UNSIGNED_BYTE, tex_bytes);
 
     glGenerateMipmap(GL_TEXTURE_2D);
 
     stbi_image_free(tex_bytes);
     //texture end
-
-    GLfloat vertices[]{
-        //  x    y     z
-            0.0, 0.5, 0.0,
-            -0.5, -0.5, 0.0,
-            0.5f, -0.5, 0.0
-    };
-
-    GLuint indices[]{
-        0,1,2
-    };
 
     GLuint VAO, VBO, EBO, VBO_UV;
     glGenVertexArrays(1, &VAO);
@@ -244,18 +244,18 @@ int main(void)
         GL_FLOAT,
         GL_FALSE,
         //XYZ UV
-        5 * sizeof(GL_FLOAT),
+        8 * sizeof(GL_FLOAT),
         (void*)0
     );
 
-    GLintptr uvPtr = 3 * sizeof(float);
+    GLintptr uvPtr = 6 * sizeof(float);
     glVertexAttribPointer(
         2,
         2,
         GL_FLOAT,
         GL_FALSE,
         //XYZ UV
-        5 * sizeof(GL_FLOAT),
+        8 * sizeof(GL_FLOAT),
         (void*)uvPtr
     );
 
@@ -308,7 +308,7 @@ int main(void)
         );
 
         glm::vec3 worldUp = glm::normalize(glm::vec3(0, 1.0f, 0));
-        glm::vec3 cameraCenter = glm::vec3(0, 3.0f, 0);
+        glm::vec3 cameraCenter = glm::vec3(x_mod, y_mod, z_mod);
 
         /*
         glm::vec3 F = (cameraCenter - cameraPos);
@@ -349,7 +349,7 @@ int main(void)
         float axis_y = 1.0;
         float axis_z = 0.0;
 
-        glm::mat4 transformation_matrix = glm::translate(identity_matrix, glm::vec3(x_mod,y_mod,z));
+        glm::mat4 transformation_matrix = glm::translate(identity_matrix, glm::vec3(x_mod,y_mod,z_mod));
 
         transformation_matrix = glm::scale(transformation_matrix, glm::vec3(scale_mod, scale_mod, scale_mod));
 
@@ -384,7 +384,10 @@ int main(void)
             0
         );
         */
-        glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 5);
+        glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 8);
+
+        //rotato
+        rx_mod += 0.1f;
 
         /*
         float x, y, nx, ny;
