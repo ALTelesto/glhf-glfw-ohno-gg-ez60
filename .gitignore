@@ -55,3 +55,9 @@ Debug/
 
 
 
+.vs/ARGUELLES_GLFW/v17/.suo
+.vs/ARGUELLES_GLFW/v17/Browse.VC.db
+*.sqlite
+.vs/VSWorkspaceState.json
+ARGUELLES_GLFW/ARGUELLES_GLFW.vcxproj
+ARGUELLES_GLFW/ARGUELLES_GLFW.vcxproj.filters
