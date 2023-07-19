@@ -1,5 +1,6 @@
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"
+#include "iostream"
 #include "math.h"
 
 #include "glm/glm.hpp"
@@ -9,10 +10,437 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#define M_PI           3.14159265358979323846
-
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
+
+//#include "Camera.hpp"
+//#include "Light.hpp"
+//#include "Model.hpp"
+
+#define M_PI           3.14159265358979323846
+
+namespace camera {
+    class Camera3D {
+    protected:
+        glm::vec3 position;
+        glm::vec3 rotation;
+        glm::vec3 center;
+        glm::mat4 projection;
+        float fov;
+
+    public:
+        Camera3D(glm::vec3 position, glm::vec3 rotation, glm::vec3 center, float fov) {
+            this->position = position;
+            this->rotation = rotation;
+            this->center = center;
+            this->fov = fov;
+            this->projection = glm::mat4(1.f);
+        }
+
+        virtual void draw(GLuint& shaderProgram) {
+            glUseProgram(shaderProgram);
+
+            glm::vec3 worldUp = glm::normalize(glm::vec3(0, 1.0f, 0));
+
+            glm::mat4 viewMatrix = glm::lookAt(position, center, worldUp);
+            unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
+            glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
+
+            unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
+            glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        }
+
+        void setPosition(glm::vec3 position) {
+            this->position = position;
+        }
+        void setRotation(glm::vec3 rotation) {
+            this->rotation = rotation;
+        }
+
+        glm::vec3 getPosition() {
+            return this->position;
+        }
+        glm::vec3 getRotation() {
+            return this->rotation;
+        }
+    };
+
+    class OrthoCamera : public Camera3D {
+    public:
+        OrthoCamera(glm::vec3 position, glm::vec3 rotation, glm::vec3 center, float fov) : Camera3D(position, rotation, center, fov) {
+            projection = glm::ortho(0.0f, 600.0f, 600.0f, 0.0f, 0.1f, 100.0f);
+        }
+        
+        void draw(GLuint& shaderProgram) {
+            glUseProgram(shaderProgram);
+
+            glm::vec3 worldUp = glm::normalize(glm::vec3(0, 1.0f, 0));
+
+            glm::mat4 viewMatrix = glm::lookAt(position, center, worldUp);
+            viewMatrix = glm::rotate(viewMatrix, glm::radians(90.f), glm::vec3(1, 0, 0));
+
+            unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
+            glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
+
+            unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
+            glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        }
+    };
+
+    class PerspectiveCamera : public Camera3D {
+    public:
+        PerspectiveCamera(glm::vec3 position, glm::vec3 rotation, glm::vec3 center, float fov) : Camera3D(position, rotation, center, fov) {
+            projection = glm::perspective(glm::radians(fov), 600.0f / 600.0f, 0.1f, 100.0f);
+        }
+    };
+}
+using namespace camera;
+
+namespace light {
+    class Light3D {
+    protected:
+        glm::vec3 position;
+        glm::vec3 color;
+        float intensity;
+
+    public:
+        Light3D(glm::vec3 position, glm::vec3 color, float intensity) {
+            this->position = position;
+            this->color = color;
+            this->intensity = intensity;
+        }
+
+        virtual void draw(GLuint& shaderProgram) = 0;
+
+        void setPosition(glm::vec3 position) {
+            this->position = position;
+        }
+        void setColor(glm::vec3 color) {
+            this->color = color;
+            std::cout << color.x << color.y << color.z << std::endl;
+        }
+        void setIntensity(float intensity) {
+            this->intensity = intensity;
+        }
+
+        float getIntensity() {
+            return this->intensity;
+        }
+    };
+
+    class DirectionalLight : public Light3D {
+    public:
+        DirectionalLight(glm::vec3 position, glm::vec3 color, float intensity) : Light3D(position, color, intensity){
+        }
+
+        void draw(GLuint& shaderProgram) {
+            GLuint lightAddress = glGetUniformLocation(shaderProgram, "dlightPos");
+            glUniform3fv(lightAddress, 1, glm::value_ptr(position));
+            GLuint lightColorAddress = glGetUniformLocation(shaderProgram, "dlightColor");
+            glUniform3fv(lightColorAddress, 1, glm::value_ptr(color));
+            GLuint lightIntensityAddress = glGetUniformLocation(shaderProgram, "dIntensity");
+            glUniform1f(lightIntensityAddress, intensity);
+            unsigned int ambientColorLoc = glGetUniformLocation(shaderProgram, "ambientColor");
+            glUniform3fv(ambientColorLoc, 1, glm::value_ptr(color));
+        }
+    };
+
+    class PointLight3D : public Light3D {
+    private:
+        glm::vec3 rotation;
+
+    public:
+        PointLight3D(glm::vec3 position, glm::vec3 color, float intensity) : Light3D(position, color, intensity) {
+            this->rotation = glm::vec3(0.f,0.f,0.f);
+        }
+
+        void draw(GLuint& shaderProgram) {
+            glm::mat4 transformation_matrix = glm::translate(glm::mat4(1.0f), this->position);
+
+            transformation_matrix = glm::rotate(transformation_matrix, glm::radians(this->rotation.x), glm::vec3(1, 0, 0));
+            transformation_matrix = glm::rotate(transformation_matrix, glm::radians(this->rotation.y), glm::vec3(0, 1, 0));
+            transformation_matrix = glm::rotate(transformation_matrix, glm::radians(this->rotation.z), glm::vec3(0, 0, 1));
+
+            glm::vec4 finalPosition = transformation_matrix * glm::vec4(1.f);
+
+            glm::vec3 position = glm::vec3(finalPosition);
+
+            GLuint lightAddress = glGetUniformLocation(shaderProgram, "plightPos");
+            glUniform3fv(lightAddress, 1, glm::value_ptr(position));
+            GLuint lightColorAddress = glGetUniformLocation(shaderProgram, "plightColor");
+            glUniform3fv(lightColorAddress, 1, glm::value_ptr(color));
+            GLuint lightIntensityAddress = glGetUniformLocation(shaderProgram, "pIntensity");
+            glUniform1f(lightIntensityAddress, intensity);
+        }
+
+        void setRotation(glm::vec3 rotation) {
+            this->rotation = rotation;
+        }
+    };
+}
+using namespace light;
+
+namespace model {
+    class Model3D {
+    private:
+        glm::vec3 position;
+        glm::vec3 rotation;
+        glm::vec3 scale;
+        glm::vec3 color;
+
+        std::vector<GLfloat> fullVertexData;
+        GLuint VAO, VBO, texture;
+
+        float specStr;
+        float specPhong;
+
+    public:
+        Model3D(std::string pathModel, std::string pathTexture, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, glm::vec3 color) {
+            this->position = position;
+            this->rotation = rotation;
+            this->scale = scale;
+            this->color = color;
+            this->specStr = 0;
+            this->specPhong = 0;
+
+            //std::string path = "3D/djSword.obj";
+            std::vector<tinyobj::shape_t> shape;
+            std::vector<tinyobj::material_t> material;
+            std::string warning, error;
+
+            tinyobj::attrib_t attributes;
+
+            /*
+            if (!pathModel.empty()) {
+                std::cout << "invalid path" << std::endl;
+                return;
+            }
+            */
+
+            bool success = tinyobj::LoadObj(
+                &attributes,
+                &shape,
+                &material,
+                &warning,
+                &error,
+                pathModel.c_str()
+            );
+
+            if (!success) {
+                std::cout << "failed loading model" << std::endl;
+                return;
+            }
+
+            for (int i = 0; i < shape[0].mesh.indices.size(); i++) {
+                tinyobj::index_t vData = shape[0].mesh.indices[i];
+                //X
+                fullVertexData.push_back(
+                    attributes.vertices[vData.vertex_index * 3]
+                );
+                //Y
+                fullVertexData.push_back(
+                    attributes.vertices[vData.vertex_index * 3 + 1]
+                );
+                //Z
+                fullVertexData.push_back(
+                    attributes.vertices[vData.vertex_index * 3 + 2]
+                );
+
+                fullVertexData.push_back(
+                    attributes.normals[vData.normal_index * 3]
+                );
+                fullVertexData.push_back(
+                    attributes.normals[vData.normal_index * 3 + 1]
+                );
+                fullVertexData.push_back(
+                    attributes.normals[vData.normal_index * 3 + 2]
+                );
+
+                //U
+                fullVertexData.push_back(
+                    attributes.texcoords[vData.texcoord_index * 2]
+                );
+                //V
+                fullVertexData.push_back(
+                    attributes.texcoords[vData.texcoord_index * 2 + 1]
+                );
+
+            }
+
+            /*
+            if (!pathTexture.empty()) {
+                std::cout << "invalid texture path" << std::endl;
+                return;
+            }
+            else {
+                int img_width, img_height, colorChannels;
+
+                stbi_set_flip_vertically_on_load(true);
+                unsigned char* tex_bytes = stbi_load(pathTexture.c_str(), &img_width, &img_height, &colorChannels, 0);
+
+                glGenTextures(1, &texture);
+
+                glActiveTexture(GL_TEXTURE0);
+
+                glBindTexture(GL_TEXTURE_2D, texture);
+
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img_width, img_height, 0, GL_RGB, GL_UNSIGNED_BYTE, tex_bytes);
+
+                glGenerateMipmap(GL_TEXTURE_2D);
+
+                glEnable(GL_DEPTH_TEST);
+
+                stbi_image_free(tex_bytes);
+            }
+            */
+
+            int img_width, img_height, colorChannels;
+
+            stbi_set_flip_vertically_on_load(true);
+            unsigned char* tex_bytes = stbi_load(pathTexture.c_str(), &img_width, &img_height, &colorChannels, 0);
+
+            glGenTextures(1, &texture);
+
+            glActiveTexture(GL_TEXTURE0);
+
+            glBindTexture(GL_TEXTURE_2D, texture);
+
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img_width, img_height, 0, GL_RGB, GL_UNSIGNED_BYTE, tex_bytes);
+
+            glGenerateMipmap(GL_TEXTURE_2D);
+
+            glEnable(GL_DEPTH_TEST);
+
+            stbi_image_free(tex_bytes);
+
+
+            glGenVertexArrays(1, &VAO);
+            glGenBuffers(1, &VBO);
+
+            glBindVertexArray(VAO);
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+            glBufferData(
+                GL_ARRAY_BUFFER,
+                sizeof(GLfloat) * fullVertexData.size(),
+                fullVertexData.data(),
+                // attributes.vertices.data(),
+                GL_DYNAMIC_DRAW);
+
+            //model
+            glVertexAttribPointer(
+                0,
+                3, //xyz
+                GL_FLOAT,
+                GL_FALSE,
+                //XYZ UV
+                8 * sizeof(GL_FLOAT),
+                (void*)0
+            );
+
+            //normal
+            GLintptr normalPtr = 3 * sizeof(float);
+            glVertexAttribPointer(
+                1,
+                3,
+                GL_FLOAT,
+                GL_FALSE,
+                8 * sizeof(GL_FLOAT),
+                (void*)normalPtr
+            );
+
+            //texture
+            GLintptr uvPtr = 6 * sizeof(float);
+            glVertexAttribPointer(
+                2,
+                2,
+                GL_FLOAT,
+                GL_FALSE,
+                //XYZ UV
+                8 * sizeof(GL_FLOAT),
+                (void*)uvPtr
+            );
+
+            glEnableVertexAttribArray(0);
+            glEnableVertexAttribArray(1);
+            glEnableVertexAttribArray(2);
+
+        }
+
+        // code was ripped from the while() loop in main() and placed into draw() function
+        void draw(GLuint& shaderProgram) {
+
+            glUseProgram(shaderProgram);
+
+            glm::mat4 identity_matrix = glm::mat4(1.0f);
+
+            // applying of model transformation
+            // translate -> rotate -> scale
+            glm::mat4 transformation_matrix = glm::translate(glm::mat4(1.0f), this->position);
+
+            transformation_matrix = glm::rotate(transformation_matrix, glm::radians(this->rotation.x), glm::vec3(1, 0, 0));
+            transformation_matrix = glm::rotate(transformation_matrix, glm::radians(this->rotation.y), glm::vec3(0, 1, 0));
+            transformation_matrix = glm::rotate(transformation_matrix, glm::radians(this->rotation.z), glm::vec3(0, 0, 1));
+
+            transformation_matrix = glm::scale(transformation_matrix, this->scale);
+            // end of applying of model transformation 
+
+            // sending transformation matrix to shader program
+            unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
+            glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
+
+            //set texture
+            GLuint tex0Address = glGetUniformLocation(shaderProgram, "tex0");
+            glBindTexture(GL_TEXTURE_2D, texture);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glUniform1i(tex0Address, 0);
+
+            //set color
+            unsigned int colorLoc = glGetUniformLocation(shaderProgram, "FragColorIn");
+            glUniform4fv(colorLoc, 1, glm::value_ptr(glm::vec4(color, 1.f)));
+            // end of sending stuff to shader program
+
+            // rendering
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 8);
+            // end
+        }
+
+        void clean() {
+            glDeleteVertexArrays(1, &VAO);
+            glDeleteBuffers(1, &VBO);
+        }
+
+        void setPosition(glm::vec3 position) {
+            this->position = position;
+        }
+        void setRotation(glm::vec3 rotation) {
+            this->rotation = rotation;
+        }
+        void setScale(glm::vec3 scale) {
+            this->scale = scale;
+        }
+        void setColor(glm::vec3 color) {
+            this->color = color;
+        }
+        void setSpec(glm::vec2 spec) {
+            this->specStr = spec.x;
+            this->specPhong = spec.y;
+        }
+
+        glm::vec3 getPosition() {
+            return this->position;
+        }
+        glm::vec3 getRotation() {
+            return this->rotation;
+        }
+    };
+}
+using namespace model;
+
+bool modelToggle = false;
+bool cameraToggle = true;
 
 float x_mod = 0.0f;
 float y_mod = 0.0f;
@@ -21,9 +449,43 @@ float z_mod = -10.0f;
 float rx_mod = 0.0f;
 float ry_mod = 0.0f;
 
-float scale_mod = 0.17f;
+float light_mod = 0.2f;
+float speed_mod = 2.f;
+float light_speed_mod = 2.f;
+
+//light distance
+float light_dist = 7.f;
+
+glm::vec3 lightOrbitRot = glm::vec3(0.f, 0.f, 0.f);
+
+//camera distance
+float cam_dist = 25.f;
+
+float sens_mod = 0.01f;  // camera sensitivity
+
+bool start = true;
+float mouseX = 0.0f;
+float mouseY = 0.0f;
+
+float scale_mod = 2.f;
 
 float fov_mod = 60.0f;
+
+OrthoCamera* cam0;
+PerspectiveCamera* cam1;
+
+DirectionalLight* light0;
+PointLight3D* light1;
+
+Model3D* model0;
+Model3D* model1;
+
+glm::quat orbitRotation(float x, float y, float z) {
+    glm::quat qX = glm::angleAxis(glm::radians(x), glm::vec3(1.0f, 0.0f, 0.0f));
+    glm::quat qY = glm::angleAxis(glm::radians(y), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::quat qZ = glm::angleAxis(glm::radians(z), glm::vec3(0.0f, 0.0f, 1.0f));
+    return qZ * qY * qX;
+}
 
 void Key_Callback(
     GLFWwindow* window,
@@ -32,41 +494,182 @@ void Key_Callback(
     int action,
     int mod
 ) {
+    glm::vec3 model0Pos = model0->getPosition();
+    glm::vec3 model1Pos = model1->getPosition();
+
+    glm::vec3 model0Rot = model0->getRotation();
+    glm::vec3 model1Rot = model1->getRotation();
+
+    float dlight = light0->getIntensity();
+    float plight = light1->getIntensity();
+
     if (key == GLFW_KEY_D && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        x_mod += 0.1;
+        model0Rot.y += speed_mod;
+        if (!modelToggle) {
+            model0->setRotation(model0Rot);
+        }
+        else {
+            lightOrbitRot.x += light_speed_mod;
+            model1->setRotation(model1Rot);
+            //light1->setRotation(model1Rot);
+        }
     }
     if (key == GLFW_KEY_A && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        x_mod -= 0.1;
+        model0Rot.y -= speed_mod;
+        if (!modelToggle) {
+            model0->setRotation(model0Rot);
+        }
+        else {
+            lightOrbitRot.x -= light_speed_mod;
+            model1->setRotation(model1Rot);
+            //light1->setRotation(model1Rot);
+        }
     }
     if (key == GLFW_KEY_W && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        y_mod += 0.1;
+        model0Rot.x -= speed_mod;
+        if (!modelToggle) {
+            model0->setRotation(model0Rot);
+        }
+        else {
+            lightOrbitRot.y += light_speed_mod;
+            model1->setRotation(model1Rot);
+            //light1->setRotation(model1Rot);
+        }
     }
     if (key == GLFW_KEY_S && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        y_mod -= 0.1;
-    }
-    if (key == GLFW_KEY_LEFT && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        rx_mod -= 10.0;
-    }
-    if (key == GLFW_KEY_RIGHT && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        rx_mod += 10.0;
-    }
-    if (key == GLFW_KEY_UP && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        ry_mod -= 10.0;
-    }
-    if (key == GLFW_KEY_DOWN && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        ry_mod += 10.0;
-    }
-    if (key == GLFW_KEY_X && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        fov_mod -= 1;
-    }
-    if (key == GLFW_KEY_Z && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        fov_mod += 1;
+        model0Rot.x += speed_mod;
+        if (!modelToggle) {
+            model0->setRotation(model0Rot);
+        }
+        else {
+            lightOrbitRot.y -= light_speed_mod;
+            //model1->setRotation(model1Rot);
+            //light1->setRotation(model1Rot);
+        }
     }
     if (key == GLFW_KEY_Q && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        scale_mod -= 0.1;
+        model0Rot.z += speed_mod;
+        if (!modelToggle) {
+            model0->setRotation(model0Rot);
+        }
+        else {
+            lightOrbitRot.z += light_speed_mod;
+            //model1->setRotation(model1Rot);
+            //light1->setRotation(model1Rot);
+        }
     }
     if (key == GLFW_KEY_E && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        scale_mod += 0.1;
+        model0Rot.z -= speed_mod;
+        if (!modelToggle) {
+            model0->setRotation(model0Rot);
+        }
+        else {
+            lightOrbitRot.z -= light_speed_mod;
+            //model1->setRotation(model1Rot);
+            //light1->setRotation(model1Rot);
+        }
+    }
+    if (key == GLFW_KEY_LEFT && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+        if (modelToggle) {
+            light0->setIntensity(dlight + light_mod);
+            std::cout << dlight << std::endl;
+        }
+    }
+    if (key == GLFW_KEY_RIGHT && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+        if (modelToggle) {
+            light0->setIntensity(dlight - light_mod);
+            std::cout << dlight << std::endl;
+        }
+    }
+    if (key == GLFW_KEY_UP && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+        if (modelToggle) {
+            light1->setIntensity(plight + light_mod);
+        }
+    }
+    if (key == GLFW_KEY_DOWN && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+        if (modelToggle) {
+            light1->setIntensity(plight - light_mod);
+        }
+    }
+    if (key == GLFW_KEY_1 && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+        cameraToggle = true;
+    }
+    if (key == GLFW_KEY_2 && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+        cameraToggle = false;
+    }
+    if (key == GLFW_KEY_SPACE && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+        modelToggle = !modelToggle;
+        if (modelToggle) {
+            model1->setColor(glm::vec3(0.0f,1.f,0.0f));
+            //light0->setColor(glm::vec3(0.0f, 1.f, 0.0f));
+            light1->setColor(glm::vec3(0.0f, 1.f, 0.0f));
+        }
+        else {
+            model1->setColor(glm::vec3(1.f, 1.f, 1.f));
+            //light0->setColor(glm::vec3(1.f, 1.f, 1.f));
+            light1->setColor(glm::vec3(1.f, 1.f, 1.f));
+        }
+    }
+
+    //float rAngle = atan2f(model1Rot.y, model1Rot.x);
+
+    float yaw = glm::radians(lightOrbitRot.y);
+    float pitch = glm::radians(lightOrbitRot.x);
+    float roll = glm::radians(lightOrbitRot.z);
+
+    glm::quat orientation = glm::quat(glm::vec3(pitch, yaw, roll));
+    glm::vec3 position = orientation * glm::vec3(0.f, 0.f, -1.f);
+    position = position * light_dist;
+
+    model1->setPosition(position);
+    model1->setRotation(lightOrbitRot);
+
+    //std::cout << "!!" << model1Rot.x << ", " << model1Rot.x << ", " << model1Rot.z << std::endl;
+    //std::cout << x << ", " << y << ", " << z << std::endl;
+}
+
+void Mouse_Callback(
+    GLFWwindow* window,
+    double mouseXNew,
+    double mouseYNew
+) {
+    if (cameraToggle) {
+        // initialize mouse position
+        if (start) {
+            mouseX = mouseXNew;
+            mouseY = mouseYNew;
+            start = false;
+        }
+        // get difference in mouse position
+        float offsetX = mouseXNew - mouseX;
+        float offsetY = mouseY - mouseYNew;
+        // set current position to the new position
+        mouseX = mouseXNew;
+        mouseY = mouseYNew;
+
+        // multiply with sensitivity modifier
+        offsetX *= -sens_mod;
+        offsetY *= sens_mod;
+
+        offsetY = glm::clamp(offsetY, -89.f, 89.f);
+
+        glm::vec3 position = cam1->getPosition();
+        glm::vec3 center = glm::vec3(0.f, 0.f, 0.f);
+
+        glm::vec3 front = glm::normalize(position - center);
+        glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0.f, 1.f, 0.f), front));
+        glm::vec3 up = glm::cross(front, right);
+
+
+
+        glm::mat4 xRot = glm::rotate(glm::mat4(1.0f), offsetX, up);
+        position = glm::vec3(xRot * glm::vec4(position, 1.f));
+
+        glm::mat4 yRot = glm::rotate(glm::mat4(1.0f), offsetY, right);
+        glm::vec4 newPos = yRot * glm::vec4(position, 1.0f);
+        position = glm::vec3(newPos.x, newPos.y, newPos.z);
+
+        cam1->setPosition(position);
     }
 }
 
@@ -79,7 +682,7 @@ int main(void)
         return -1;
 
     /* Create a windowed mode window and its OpenGL context */
-    window = glfwCreateWindow(600, 600, "Hello World", NULL, NULL);
+    window = glfwCreateWindow(600, 600, "Joachim Arguelles Programming Challenge 2", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -96,6 +699,7 @@ int main(void)
 
 
     glfwSetKeyCallback(window, Key_Callback);
+    glfwSetCursorPosCallback(window, Mouse_Callback);
 
     //shaders
 
@@ -124,328 +728,51 @@ int main(void)
     glAttachShader(shaderProgram, fragShader);
 
     glLinkProgram(shaderProgram);
+    
+    std::fstream unlit_vertSrc("Shaders/sample.vert");
+    std::stringstream unlit_vertBuff;
+    unlit_vertBuff << unlit_vertSrc.rdbuf();
+    std::string unlit_vertS = unlit_vertBuff.str();
+    const char* unlit_v = unlit_vertS.c_str();
+
+    std::fstream unlit_fragSrc("Shaders/unlit.frag");
+    std::stringstream unlit_fragBuff;
+    unlit_fragBuff << unlit_fragSrc.rdbuf();
+    std::string unlit_fragS = unlit_fragBuff.str();
+    const char* unlit_f = unlit_fragS.c_str();
+
+    GLuint unlit_vertShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(unlit_vertShader, 1, &unlit_v, NULL);
+    glCompileShader(unlit_vertShader);
+
+    GLuint unlit_fragShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(unlit_fragShader, 1, &unlit_f, NULL);
+    glCompileShader(unlit_fragShader);
+
+    GLuint unlitshaderProgram = glCreateProgram();
+    glAttachShader(unlitshaderProgram, unlit_vertShader);
+    glAttachShader(unlitshaderProgram, unlit_fragShader);
+
+    glLinkProgram(unlitshaderProgram);
 
     //shaders
 
-    //skybox shaders
+    cam0 = new OrthoCamera(glm::vec3(0.f, cam_dist, 0.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 0.f), 60.0);
+    cam1 = new PerspectiveCamera(glm::vec3(0.f, 0.f, cam_dist), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 0.f), 60.0);
 
-    std::fstream sky_vertSrc("Shaders/skybox.vert");
-    std::stringstream sky_vertBuff;
-    sky_vertBuff << sky_vertSrc.rdbuf();
-    std::string sky_vertS = sky_vertBuff.str();
-    const char* sky_v = sky_vertS.c_str();
+    light0 = new DirectionalLight(glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.5f, 0.5f, 0.5f), 2.0);
 
-    std::fstream sky_fragSrc("Shaders/skybox.frag");
-    std::stringstream sky_fragBuff;
-    sky_fragBuff << sky_fragSrc.rdbuf();
-    std::string sky_fragS = sky_fragBuff.str();
-    const char* sky_f = sky_fragS.c_str();
+    //main model
+    //model source: roblox avatar, exported from roblox
+    model0 = new Model3D("3D/peanut.obj", "3D/peanut.jpg", glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(scale_mod, scale_mod, scale_mod), glm::vec3(1.f, 1.f, 1.f));
 
-    GLuint sky_vertShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(sky_vertShader, 1, &sky_v, NULL);
-    glCompileShader(sky_vertShader);
+    //light model
+    //model source: blender (default cube)
+    model1 = new Model3D("3D/blenderdefaultcube.obj", "3D/partenza.jpg", glm::vec3(0.f, 0.f, -light_dist), glm::vec3(0.001f, 0.f, 0.001f), glm::vec3(1.f, 1.f, 1.f), glm::vec3(1.f, 1.f, 1.f));
+    light1 = new PointLight3D(model1->getPosition(), glm::vec3(1.f, 1.f, 1.f), 10.0);
 
-    GLuint sky_fragShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(sky_fragShader, 1, &sky_f, NULL);
-    glCompileShader(sky_fragShader);
-
-    GLuint skyboxProgram = glCreateProgram();
-    glAttachShader(skyboxProgram, sky_vertShader);
-    glAttachShader(skyboxProgram, sky_fragShader);
-
-    glLinkProgram(skyboxProgram);
-
-    //skybox shaders
-    //skybox
-    /*
-      7--------6
-     /|       /|
-    4--------5 |
-    | |      | |
-    | 3------|-2
-    |/       |/
-    0--------1
-    */
-    //Vertices for the cube
-    float skyboxVertices[]{
-        -1.f, -1.f, 1.f, //0
-        1.f, -1.f, 1.f,  //1
-        1.f, -1.f, -1.f, //2
-        -1.f, -1.f, -1.f,//3
-        -1.f, 1.f, 1.f,  //4
-        1.f, 1.f, 1.f,   //5
-        1.f, 1.f, -1.f,  //6
-        -1.f, 1.f, -1.f  //7
-    };
-
-    //Skybox Indices
-    unsigned int skyboxIndices[]{
-        1,2,6,
-        6,5,1,
-
-        0,4,7,
-        7,3,0,
-
-        4,5,6,
-        6,7,4,
-
-        0,3,2,
-        2,1,0,
-
-        0,1,5,
-        5,4,0,
-
-        3,7,6,
-        6,2,3
-    };
-
-    unsigned int skyboxVAO, skyboxVBO, skyboxEBO;
-    glGenVertexArrays(1, &skyboxVAO);
-    glGenBuffers(1, &skyboxVBO);
-    glGenBuffers(1, &skyboxEBO);
-
-    glBindVertexArray(skyboxVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GL_FLOAT), (void*)0);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, skyboxEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(skyboxIndices), &skyboxIndices, GL_STATIC_DRAW);
-
-    glEnableVertexAttribArray(0);
-
-    std::string facesSkybox[]{
-        "Skybox/rainbow_rt.png",
-        "Skybox/rainbow_lf.png",
-        "Skybox/rainbow_up.png",
-        "Skybox/rainbow_dn.png",
-        "Skybox/rainbow_ft.png",
-        "Skybox/rainbow_bk.png"
-    };
-
-    unsigned int skyboxTex;
-    glGenTextures(1, &skyboxTex);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTex);
-
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    for (unsigned int i = 0; i < 6; i++) {
-        int w, h, skyCChanel;
-        stbi_set_flip_vertically_on_load(false);
-        unsigned char* data = stbi_load(facesSkybox[i].c_str(), 
-                                        &w, 
-                                        &h, 
-                                        &skyCChanel, 
-                                        0);
-        if (data) {
-            glTexImage2D(   
-                GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
-                0,
-                GL_RGB,
-                w,
-                h,
-                0,
-                GL_RGB,
-                GL_UNSIGNED_BYTE,
-                data
-            );
-        }
-
-        stbi_image_free(data);
-    }
-
-    //skybox
-
-    //3d model
-
-    std::string path = "3D/djSword.obj";
-    std::vector<tinyobj::shape_t> shape;
-    std::vector<tinyobj::material_t> material;
-    std::string warning, error;
-
-    tinyobj::attrib_t attributes;
-
-    bool success = tinyobj::LoadObj(
-        &attributes,
-        &shape,
-        &material,
-        &warning,
-        &error,
-        path.c_str()
-    );
-
-    std::vector<GLuint> mesh_indices;
-    for (int i = 0; i < shape[0].mesh.indices.size(); i++) {
-        mesh_indices.push_back(
-            shape[0].mesh.indices[i].vertex_index
-        );
-    }
-
-    //3d model
-
-    //texture
-    std::vector<GLfloat> fullVertexData;
-    for (int i = 0; i < shape[0].mesh.indices.size(); i++) {
-        tinyobj::index_t vData = shape[0].mesh.indices[i];
-        //X
-        fullVertexData.push_back(
-            attributes.vertices[vData.vertex_index * 3]
-        );
-        //Y
-        fullVertexData.push_back(
-            attributes.vertices[vData.vertex_index * 3 + 1]
-        );
-        //Z
-        fullVertexData.push_back(
-            attributes.vertices[vData.vertex_index * 3 + 2]
-        );
-
-        fullVertexData.push_back(
-            attributes.normals[vData.normal_index * 3]
-        );
-        fullVertexData.push_back(
-            attributes.normals[vData.normal_index * 3 + 1]
-        );
-        fullVertexData.push_back(
-            attributes.normals[vData.normal_index * 3 + 2]
-        );
-
-        //U
-        fullVertexData.push_back(
-            attributes.texcoords[vData.texcoord_index * 2]
-        );
-        //V
-        fullVertexData.push_back(
-            attributes.texcoords[vData.texcoord_index * 2 + 1]
-        );
-
-    }
-    
-    glfwMakeContextCurrent(window);
-    gladLoadGL();
-    int img_width, img_height, colorChannels;
-
-    stbi_set_flip_vertically_on_load(true);
-    unsigned char* tex_bytes = stbi_load("3D/pikachu.jpg", &img_width, &img_height, &colorChannels, 0);
-
-    GLuint texture;
-
-    glGenTextures(1, &texture);
-
-    glActiveTexture(GL_TEXTURE0);
-
-    glBindTexture(GL_TEXTURE_2D, texture);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img_width, img_height, 0, GL_RGB, GL_UNSIGNED_BYTE, tex_bytes);
-
-    glGenerateMipmap(GL_TEXTURE_2D);
-
-    stbi_image_free(tex_bytes);
-    //texture end
-
-
-    //lighting
-    glm::vec3 lightPos = glm::vec3(-10, 3, 0);
-    glm::vec3 lightColor = glm::vec3(1, 1, 1);
-
-    float ambientStr = 0.1f;
-    glm::vec3 ambientColor = lightColor;
-
-    float specStr = 0.5f;
-    float specPhong = 16;
-    //lighting end
-
-
-
-
-
-    GLuint VAO, VBO, EBO, VBO_UV;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    //glGenBuffers(1, &VBO_UV);
-    //glGenBuffers(1, &EBO);
-
-    //text
-    glBindVertexArray(VAO);
-    //text
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(
-        GL_ARRAY_BUFFER,
-        sizeof(GLfloat) * fullVertexData.size(),
-        fullVertexData.data(),
-        GL_STATIC_DRAW
-    );
-
-    //model
-    glVertexAttribPointer(
-        0,
-        3, //xyz
-        GL_FLOAT,
-        GL_FALSE,
-        //XYZ UV
-        8 * sizeof(GL_FLOAT),
-        (void*)0
-    );
-
-    //normal
-    GLintptr normalPtr = 3 * sizeof(float);
-    glVertexAttribPointer(
-        1,
-        3,
-        GL_FLOAT,
-        GL_FALSE,
-        8 * sizeof(GL_FLOAT),
-        (void*)normalPtr
-    );
-
-    //texture
-    GLintptr uvPtr = 6 * sizeof(float);
-    glVertexAttribPointer(
-        2,
-        2,
-        GL_FLOAT,
-        GL_FALSE,
-        //XYZ UV
-        8 * sizeof(GL_FLOAT),
-        (void*)uvPtr
-    );
-
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glEnableVertexAttribArray(2);
-
-    //texture
-    /*
-    glBindBuffer(GL_ARRAY_BUFFER, VBO_UV);
-    glBufferData(GL_ARRAY_BUFFER,
-                sizeof(GLfloat) * (sizeof(UV) / sizeof(UV[0])),
-                &UV[0],
-                GL_DYNAMIC_DRAW);
-
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-  
-    */
-    //texture end
-
-    /*
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(
-        GL_ELEMENT_ARRAY_BUFFER,
-        sizeof(GLuint) * mesh_indices.size(),
-        mesh_indices.data(),
-        GL_STATIC_DRAW
-    );
-    */
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-    glm::mat4 identity_matrix = glm::mat4(1.0f);
+    float ambientStr = 0.2f;
+    glm::vec3 ambientColor = glm::vec3(1.0f, 1.0f, 1.0f);
 
     glEnable(GL_DEPTH_TEST);
 
@@ -454,158 +781,32 @@ int main(void)
     {
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        //rabbit pos = 0,0,-5
-        //camera pos = 0,0,10
-        //camera center = 0,3,0
-        glm::vec3 cameraPos = glm::vec3(0, 0, 10.f);
-        glm::mat4 cameraPosMatrix = glm::translate(
-            glm::mat4(1.0f),
-            cameraPos * -1.0f
-        );
-
-        glm::vec3 worldUp = glm::normalize(glm::vec3(0, 1.0f, 0));
-        glm::vec3 cameraCenter = glm::vec3(x_mod, y_mod, z_mod);
-
-        /*
-        glm::vec3 F = (cameraCenter - cameraPos);
-        F = glm::normalize(F);
-
-        glm::vec3 R = glm::normalize(glm::cross(F, worldUp));
-        glm::vec3 U = glm::cross(R, F);
-
-        glm::mat4 cameraOrientation = glm::mat4(1.0f);
-
-        cameraOrientation[0][0] = R.x;
-        cameraOrientation[1][0] = R.y;
-        cameraOrientation[2][0] = R.z;
-
-        cameraOrientation[0][1] = U.x;
-        cameraOrientation[1][1] = U.y;
-        cameraOrientation[2][1] = U.z;
-
-        cameraOrientation[0][2] = -F.x;
-        cameraOrientation[1][2] = -F.y;
-        cameraOrientation[2][2] = -F.z;
-
-        glm::mat4 viewMatrix = cameraOrientation * cameraPosMatrix;
-        */
-
-        glm::mat4 viewMatrix = glm::lookAt(cameraPos, cameraCenter, worldUp);
-        glm::mat4 projection = glm::perspective(glm::radians(fov_mod), 600.0f / 600.0f, 0.1f, 100.0f);
-
-        glDepthMask(GL_FALSE);
-        glDepthFunc(GL_LEQUAL);
-
-        glUseProgram(skyboxProgram);
-        glm::mat4 skyView = glm::mat4(1.f);
-        skyView = glm::mat4(glm::mat3(viewMatrix));
-
-        unsigned int sky_ProjectionLoc = glGetUniformLocation(skyboxProgram, "projection");
-        glUniformMatrix4fv(sky_ProjectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-        unsigned int sky_ViewLoc = glGetUniformLocation(skyboxProgram, "view");
-        glUniformMatrix4fv(sky_ViewLoc, 1, GL_FALSE, glm::value_ptr(skyView));
-
-        glBindVertexArray(skyboxVAO);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTex);
-
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-
-        glDepthMask(GL_TRUE);
-        glDepthFunc(GL_LESS);
-
-        glUseProgram(shaderProgram);
-
         
-
-        float x = 0.0;
-        float y = 0.0;
-        float z = -5.0;
-        float scale_x = 1.0;
-        float scale_y = 1.0;
-        float scale_z = 1.0;
-        float radians = 90.0;
-        float axis_x = 0.0;
-        float axis_y = 1.0;
-        float axis_z = 0.0;
-
-        glm::mat4 transformation_matrix = glm::translate(identity_matrix, glm::vec3(x_mod,y_mod,z_mod));
-
-        transformation_matrix = glm::scale(transformation_matrix, glm::vec3(scale_mod, scale_mod, scale_mod));
-
-        transformation_matrix = glm::rotate(transformation_matrix, glm::radians(rx_mod), glm::normalize(glm::vec3(axis_x, axis_y, axis_z)));
-
-        transformation_matrix = glm::rotate(transformation_matrix, glm::radians(ry_mod), glm::normalize(glm::vec3(axis_y, axis_x, axis_z)));
-
-        unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
-
-        unsigned int transformLoc = glGetUniformLocation(shaderProgram, "transform");
-        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
-
-        unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-        GLuint tex0Address = glGetUniformLocation(shaderProgram, "tex0");
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glUniform1i(tex0Address, 0);
-
-        GLuint lightAddress = glGetUniformLocation(shaderProgram, "lightPos");
-        glUniform3fv(lightAddress, 1, glm::value_ptr(lightPos));
-        GLuint lightColorAddress = glGetUniformLocation(shaderProgram, "lightColor");
-        glUniform3fv(lightColorAddress, 1, glm::value_ptr(lightColor));
-        GLuint ambientStrAddress = glGetUniformLocation(shaderProgram, "ambientStr");
-        glUniform1f(ambientStrAddress, ambientStr);
-        GLuint ambientColorAddress = glGetUniformLocation(shaderProgram, "ambientColor");
-        glUniform3fv(ambientColorAddress, 1, glm::value_ptr(ambientColor));
-        GLuint cameraPosAddress = glGetUniformLocation(shaderProgram, "cameraPos");
-        glUniform3fv(cameraPosAddress, 1, glm::value_ptr(cameraPos));
-        GLuint specStrAddress = glGetUniformLocation(shaderProgram, "specStr");
-        glUniform1f(specStrAddress, specStr);
-        GLuint specPhongAddress = glGetUniformLocation(shaderProgram, "specPhong");
-        glUniform1f(specPhongAddress, specPhong);
-
-
-        glUseProgram(shaderProgram);
-        glBindVertexArray(VAO);
-        //glDrawArrays(GL_TRIANGLES, 0, 3);
-        /*
-        glDrawElements(
-            GL_TRIANGLES, 
-            mesh_indices.size(), 
-            GL_UNSIGNED_INT, 
-            0
-        );
-        */
-        glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 8);
-
-        //rotato
-        rx_mod += 0.1f;
-
-        /*
-        float x, y, nx, ny;
-        int i;
-        glBegin(GL_POLYGON);
-
-        x = 0.5;
-        y = 0.0;
-
-        glVertex2f(x, y);
-
-        
-        for (i = 0; i < 5; i++) {
-            nx = x * cosf((72.0 * i) * (M_PI / 180)) - y * sinf((72.0 * i) * (M_PI / 180));
-            ny = y * cosf((72.0 * i) * (M_PI / 180)) + x * sinf((72.0 * i) * (M_PI / 180));
-            glVertex2f(nx,ny);
+        if (!cameraToggle) {
+            cam0->draw(shaderProgram);
         }
-        
+        else {
+            cam1->draw(shaderProgram);
+        }
 
-        glEnd();
-        */
+        light0->draw(shaderProgram);
+
+        light1->setPosition(model1->getPosition());
+
+        light1->draw(shaderProgram);
+
+        unsigned int ambientStrLoc = glGetUniformLocation(shaderProgram, "ambientStr");
+        glUniform1f(ambientStrLoc, light0->getIntensity() * ambientStr);
+
+        model0->draw(shaderProgram);
+        
+        if (!cameraToggle) {
+            cam0->draw(unlitshaderProgram);
+        }
+        else {
+            cam1->draw(unlitshaderProgram);
+        }
+        model1->draw(unlitshaderProgram);
 
         /* Swap front and back buffers */
         glfwSwapBuffers(window);
@@ -614,9 +815,8 @@ int main(void)
         glfwPollEvents();
     }
 
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
+    model0->clean();
+    model1->clean();
 
     glfwTerminate();
     return 0;
