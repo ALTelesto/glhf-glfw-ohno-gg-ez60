@@ -77,7 +77,7 @@ namespace camera {
             glm::vec3 worldUp = glm::normalize(glm::vec3(0, 1.0f, 0));
 
             glm::mat4 viewMatrix = glm::lookAt(position, center, worldUp);
-            viewMatrix = glm::rotate(viewMatrix, glm::radians(90.f), glm::vec3(1, 0, 0));
+            //viewMatrix = glm::rotate(viewMatrix, glm::radians(-90.f), glm::vec3(0, 1, 0));
 
             unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
             glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
@@ -480,11 +480,25 @@ PointLight3D* light1;
 Model3D* model0;
 Model3D* model1;
 
-glm::quat orbitRotation(float x, float y, float z) {
-    glm::quat qX = glm::angleAxis(glm::radians(x), glm::vec3(1.0f, 0.0f, 0.0f));
-    glm::quat qY = glm::angleAxis(glm::radians(y), glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::quat qZ = glm::angleAxis(glm::radians(z), glm::vec3(0.0f, 0.0f, 1.0f));
-    return qZ * qY * qX;
+void fixRotation() {
+    if (lightOrbitRot.x > 360) {
+        lightOrbitRot.x = 0;
+    }
+    if (lightOrbitRot.x < 0) {
+        lightOrbitRot.x = 360;
+    }
+    if (lightOrbitRot.y > 360) {
+        lightOrbitRot.y = 0;
+    }
+    if (lightOrbitRot.y < 0) {
+        lightOrbitRot.y = 360;
+    }
+    if (lightOrbitRot.z > 360) {
+        lightOrbitRot.z = 0;
+    }
+    if (lightOrbitRot.z < 0) {
+        lightOrbitRot.z = 360;
+    }
 }
 
 void Key_Callback(
@@ -612,6 +626,8 @@ void Key_Callback(
     }
 
     //float rAngle = atan2f(model1Rot.y, model1Rot.x);
+
+    fixRotation();
 
     float yaw = glm::radians(lightOrbitRot.y);
     float pitch = glm::radians(lightOrbitRot.x);

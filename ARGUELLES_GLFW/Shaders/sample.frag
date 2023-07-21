@@ -65,12 +65,15 @@ void main(){
 	//source: https://learnopengl.com/Lighting/Light-casters
 	float attenuation = pIntensity / (1.0 + 0.22*distance + 0.20*(distance*distance));
 
+	vec3 pointlight = (pdiffuse + pspecColor) * attenuation;
+	vec3 dirlight = ddiffuse + dspecColor;
+
 	//				    r    g    b    a
 	//FragColor = vec4(0.0, 0.7, 0.0, 1.0);		//solid color
 	//FragColor = texture(tex0, texCoord);		//textured
 
 	//application of texture color + all lights
-	vec3 combinedLights = (pspecColor + dspecColor) * attenuation + (pdiff * attenuation) + (ddiff * dIntensity) + (ambientCol);
+	vec3 combinedLights = pointlight + (dirlight * dIntensity) + ambientCol;
 
 	FragColor = vec4(combinedLights,1.0) * texture(tex0, texCoord);	//shaded texture
 }
