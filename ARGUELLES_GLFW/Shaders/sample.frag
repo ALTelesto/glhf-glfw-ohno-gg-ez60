@@ -2,6 +2,7 @@
 
 //texture
 uniform sampler2D tex0;
+uniform sampler2D norm_tex;
 
 //light
 uniform vec3 lightPos;
@@ -21,12 +22,24 @@ in vec2 texCoord;
 in vec3 normCoord;
 in vec3 fragPos;
 
+in mat3 TBN;
+
 out vec4 FragColor;
 
 void main(){
 	
+	//vec3 normal = normalize(normCoord);
+	vec3 normal = texture(norm_tex, texCoord).rgb;
+	normal = normalize(normal * 2.0 - 1.0);
+	normal = normalize(TBN * normal);
+
+	vec4 pixelColor = texture(tex0, texCoord);
+
+	if(pixelColor.a<0.1){
+		discard;
+	}
+	
 	//light calcu
-	vec3 normal = normalize(normCoord);
 	vec3 lightDir = normalize(lightPos - fragPos);
 	float diff = max(dot(normal,lightDir),0.0);
 
@@ -48,7 +61,8 @@ void main(){
 	//inverse square law
 	//get smooth attenuation wherein light intensity decrease with increasing distance from source
 	//source: https://learnopengl.com/Lighting/Light-casters
-	float attenuation = 10.0 / (1.0 + 0.22*distance + 0.20*(distance*distance));
+	float attenuation = 10.0 / (1.0 + 0.14*distance + 0.07*(distance*distance));
+	//float attenuation = 1.0;
 
 	//				    r    g    b    a
 	//FragColor = vec4(0.0, 0.7, 0.0, 1.0);		//solid color
@@ -56,4 +70,5 @@ void main(){
 
 	//application of texture color + all lights
 	FragColor = vec4(specColor*attenuation + diffuse*attenuation + ambientCol*attenuation,1.0) * texture(tex0, texCoord);	//shaded texture
+
 }

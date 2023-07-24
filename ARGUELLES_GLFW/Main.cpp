@@ -21,7 +21,7 @@ float z_mod = -10.0f;
 float rx_mod = 0.0f;
 float ry_mod = 0.0f;
 
-float scale_mod = 0.17f;
+float scale_mod = 3.f;
 
 float fov_mod = 60.0f;
 
@@ -69,6 +69,8 @@ void Key_Callback(
         scale_mod += 0.1;
     }
 }
+
+
 
 int main(void)
 {
@@ -263,7 +265,7 @@ int main(void)
 
     //3d model
 
-    std::string path = "3D/djSword.obj";
+    std::string path = "3D/peanut.obj";
     std::vector<tinyobj::shape_t> shape;
     std::vector<tinyobj::material_t> material;
     std::string warning, error;
@@ -287,6 +289,59 @@ int main(void)
     }
 
     //3d model
+
+    std::vector<glm::vec3> tangents;
+    std::vector<glm::vec3> bitangents;
+
+    for (size_t i = 0; i < shape[0].mesh.indices.size(); i+= 3) {
+        tinyobj::index_t vData1 = shape[0].mesh.indices[i];
+        tinyobj::index_t vData2 = shape[0].mesh.indices[i+1];
+        tinyobj::index_t vData3 = shape[0].mesh.indices[i+2];
+        glm::vec3 v1 = glm::vec3(
+            attributes.vertices[vData1.vertex_index * 3],
+            attributes.vertices[vData1.vertex_index * 3 + 1],
+            attributes.vertices[vData1.vertex_index * 3 + 2]
+        );
+        glm::vec3 v2 = glm::vec3(
+            attributes.vertices[vData2.vertex_index * 3],
+            attributes.vertices[vData2.vertex_index * 3 + 1],
+            attributes.vertices[vData2.vertex_index * 3 + 2]
+        );
+        glm::vec3 v3 = glm::vec3(
+            attributes.vertices[vData3.vertex_index * 3],
+            attributes.vertices[vData3.vertex_index * 3 + 1],
+            attributes.vertices[vData3.vertex_index * 3 + 2]
+        );
+        glm::vec2 uv1 = glm::vec2(
+            attributes.texcoords[(vData1.texcoord_index * 2)],
+            attributes.texcoords[(vData1.texcoord_index * 2) + 1]
+        );
+        glm::vec2 uv2 = glm::vec2(
+            attributes.texcoords[(vData2.texcoord_index * 2)],
+            attributes.texcoords[(vData2.texcoord_index * 2) + 1]
+        );
+        glm::vec2 uv3 = glm::vec2(
+            attributes.texcoords[(vData3.texcoord_index * 2)],
+            attributes.texcoords[(vData3.texcoord_index * 2) + 1]
+        );
+        glm::vec3 deltaPos1 = v2 - v1;
+        glm::vec3 deltaPos2 = v3 - v1;
+
+        glm::vec2 deltaUV1 = uv2 - uv1;
+        glm::vec2 deltaUV2 = uv3 - uv1;
+
+        float r = 1.0f / ((deltaUV1.x * deltaUV2.y) - (deltaUV1.y * deltaUV2.x));
+        glm::vec3 tangent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * r;
+        glm::vec3 bitangent = (deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * r;
+
+        tangents.push_back(tangent);
+        tangents.push_back(tangent);
+        tangents.push_back(tangent);
+
+        bitangents.push_back(bitangent);
+        bitangents.push_back(bitangent);
+        bitangents.push_back(bitangent);
+    }
 
     //texture
     std::vector<GLfloat> fullVertexData;
@@ -324,14 +379,35 @@ int main(void)
             attributes.texcoords[vData.texcoord_index * 2 + 1]
         );
 
+        fullVertexData.push_back(
+            tangents[i].x
+        );
+        fullVertexData.push_back(
+            tangents[i].y
+        );
+        fullVertexData.push_back(
+            tangents[i].z
+        );
+
+        fullVertexData.push_back(
+            bitangents[i].x
+        );
+        fullVertexData.push_back(
+            bitangents[i].y
+        );
+        fullVertexData.push_back(
+            bitangents[i].z
+        );
     }
     
     glfwMakeContextCurrent(window);
     gladLoadGL();
+
+
     int img_width, img_height, colorChannels;
 
     stbi_set_flip_vertically_on_load(true);
-    unsigned char* tex_bytes = stbi_load("3D/pikachu.jpg", &img_width, &img_height, &colorChannels, 0);
+    unsigned char* tex_bytes = stbi_load("3D/brickwall.jpg", &img_width, &img_height, &colorChannels, 0);
 
     GLuint texture;
 
@@ -348,6 +424,28 @@ int main(void)
     stbi_image_free(tex_bytes);
     //texture end
 
+    //normal texure
+
+    int img_width2, img_height2, colorChannels2;
+
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* norm_bytes = stbi_load("3D/brickwall_normal.jpg", &img_width2, &img_height2, &colorChannels2, 0);
+
+    GLuint normtexture;
+
+    glGenTextures(1, &normtexture);
+
+    glActiveTexture(GL_TEXTURE1);
+
+    glBindTexture(GL_TEXTURE_2D, normtexture);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img_width2, img_height2, 0, GL_RGB, GL_UNSIGNED_BYTE, norm_bytes);
+
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    stbi_image_free(norm_bytes);
+    //normal texture end
+
 
     //lighting
     glm::vec3 lightPos = glm::vec3(-10, 3, 0);
@@ -356,7 +454,7 @@ int main(void)
     float ambientStr = 0.1f;
     glm::vec3 ambientColor = lightColor;
 
-    float specStr = 0.5f;
+    float specStr = 0.8f;
     float specPhong = 16;
     //lighting end
 
@@ -388,7 +486,7 @@ int main(void)
         GL_FLOAT,
         GL_FALSE,
         //XYZ UV
-        8 * sizeof(GL_FLOAT),
+        14 * sizeof(GL_FLOAT),
         (void*)0
     );
 
@@ -399,7 +497,7 @@ int main(void)
         3,
         GL_FLOAT,
         GL_FALSE,
-        8 * sizeof(GL_FLOAT),
+        14 * sizeof(GL_FLOAT),
         (void*)normalPtr
     );
 
@@ -411,13 +509,37 @@ int main(void)
         GL_FLOAT,
         GL_FALSE,
         //XYZ UV
-        8 * sizeof(GL_FLOAT),
+        14 * sizeof(GL_FLOAT),
         (void*)uvPtr
+    );
+
+    GLintptr tangentPtr = 8 * sizeof(float);
+    glVertexAttribPointer(
+        3,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        //XYZ UV
+        14 * sizeof(GL_FLOAT),
+        (void*)tangentPtr
+    );
+
+    GLintptr bitangentPtr = 11 * sizeof(float);
+    glVertexAttribPointer(
+        4,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        //XYZ UV
+        14 * sizeof(GL_FLOAT),
+        (void*)bitangentPtr
     );
 
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
+    glEnableVertexAttribArray(3);
+    glEnableVertexAttribArray(4);
 
     //texture
     /*
@@ -448,6 +570,10 @@ int main(void)
     glm::mat4 identity_matrix = glm::mat4(1.0f);
 
     glEnable(GL_DEPTH_TEST);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    //glBlendFunc(GL_SRC_ALPHA, GL_SRC_COLOR);
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
@@ -548,11 +674,19 @@ int main(void)
         unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
+        glActiveTexture(GL_TEXTURE0);
         GLuint tex0Address = glGetUniformLocation(shaderProgram, "tex0");
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glUniform1i(tex0Address, 0);
+
+        glActiveTexture(GL_TEXTURE1);
+        GLuint tex1Address = glGetUniformLocation(shaderProgram, "norm_tex");
+        glBindTexture(GL_TEXTURE_2D, normtexture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glUniform1i(tex1Address, 1);
 
         GLuint lightAddress = glGetUniformLocation(shaderProgram, "lightPos");
         glUniform3fv(lightAddress, 1, glm::value_ptr(lightPos));
@@ -584,7 +718,7 @@ int main(void)
         glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 8);
 
         //rotato
-        rx_mod += 0.1f;
+        ry_mod -= 0.4f;
 
         /*
         float x, y, nx, ny;
