@@ -143,8 +143,6 @@ namespace light {
             glUniform3fv(lightColorAddress, 1, glm::value_ptr(color));
             GLuint lightIntensityAddress = glGetUniformLocation(shaderProgram, "dIntensity");
             glUniform1f(lightIntensityAddress, intensity);
-            unsigned int ambientColorLoc = glGetUniformLocation(shaderProgram, "ambientColor");
-            glUniform3fv(ambientColorLoc, 1, glm::value_ptr(color));
         }
     };
 
@@ -589,13 +587,13 @@ void Key_Callback(
     if (key == GLFW_KEY_LEFT && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
         if (modelToggle) {
             light0->setIntensity(dlight + light_mod);
-            std::cout << dlight << std::endl;
+            //std::cout << dlight << std::endl;
         }
     }
     if (key == GLFW_KEY_RIGHT && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        if (modelToggle) {
+        if (modelToggle && dlight > 0) {
             light0->setIntensity(dlight - light_mod);
-            std::cout << dlight << std::endl;
+            //std::cout << dlight << std::endl;
         }
     }
     if (key == GLFW_KEY_UP && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
@@ -604,7 +602,7 @@ void Key_Callback(
         }
     }
     if (key == GLFW_KEY_DOWN && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        if (modelToggle) {
+        if (modelToggle && plight > 0) {
             light1->setIntensity(plight - light_mod);
         }
     }
@@ -782,7 +780,7 @@ int main(void)
     cam0 = new OrthoCamera(glm::vec3(0.f, cam_dist, cam_dist/100), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 0.f), 60.0);
     cam1 = new PerspectiveCamera(glm::vec3(0.f, 0.f, cam_dist), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 0.f), 60.0);
 
-    light0 = new DirectionalLight(glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.5f, 0.5f, 0.5f), 2.0);
+    light0 = new DirectionalLight(glm::vec3(5.f, -10.f, -1.f), glm::vec3(0.5f, 0.5f, 0.5f), 0.25);
 
     //main model
     //model source: roblox avatar, exported from roblox
@@ -826,8 +824,11 @@ int main(void)
 
         light1->draw(shaderProgram);
 
+        unsigned int ambientColorLoc = glGetUniformLocation(shaderProgram, "ambientColor");
+        glUniform3fv(ambientColorLoc, 1, glm::value_ptr(ambientColor));
+
         unsigned int ambientStrLoc = glGetUniformLocation(shaderProgram, "ambientStr");
-        glUniform1f(ambientStrLoc, light0->getIntensity() * ambientStr);
+        glUniform1f(ambientStrLoc, ambientStr);
 
         model0->draw(shaderProgram);
         
