@@ -20,56 +20,11 @@ float z_mod = -10.0f;
 
 float rx_mod = 0.0f;
 float ry_mod = 0.0f;
+float rz_mod = -90.0f;
 
-float scale_mod = 3.f;
+float scale_mod = 6.f;
 
 float fov_mod = 60.0f;
-
-void Key_Callback(
-    GLFWwindow* window,
-    int key,
-    int scancode,
-    int action,
-    int mod
-) {
-    if (key == GLFW_KEY_D && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        x_mod += 0.1;
-    }
-    if (key == GLFW_KEY_A && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        x_mod -= 0.1;
-    }
-    if (key == GLFW_KEY_W && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        y_mod += 0.1;
-    }
-    if (key == GLFW_KEY_S && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        y_mod -= 0.1;
-    }
-    if (key == GLFW_KEY_LEFT && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        rx_mod -= 10.0;
-    }
-    if (key == GLFW_KEY_RIGHT && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        rx_mod += 10.0;
-    }
-    if (key == GLFW_KEY_UP && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        ry_mod -= 10.0;
-    }
-    if (key == GLFW_KEY_DOWN && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        ry_mod += 10.0;
-    }
-    if (key == GLFW_KEY_X && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        fov_mod -= 1;
-    }
-    if (key == GLFW_KEY_Z && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        fov_mod += 1;
-    }
-    if (key == GLFW_KEY_Q && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        scale_mod -= 0.1;
-    }
-    if (key == GLFW_KEY_E && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        scale_mod += 0.1;
-    }
-}
-
 
 
 int main(void)
@@ -95,9 +50,6 @@ int main(void)
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
     gladLoadGL();
-
-
-    glfwSetKeyCallback(window, Key_Callback);
 
     //shaders
 
@@ -265,7 +217,7 @@ int main(void)
 
     //3d model
 
-    std::string path = "3D/peanut.obj";
+    std::string path = "3D/plane.obj";
     std::vector<tinyobj::shape_t> shape;
     std::vector<tinyobj::material_t> material;
     std::string warning, error;
@@ -446,9 +398,30 @@ int main(void)
     stbi_image_free(norm_bytes);
     //normal texture end
 
+    //additional texure
+    int img_width3, img_height3, colorChannels3;
+
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* tex_bytes2 = stbi_load("3D/yae.png", &img_width3, &img_height3, &colorChannels3, 0);
+
+    GLuint texture2;
+
+    glGenTextures(1, &texture2);
+
+    glActiveTexture(GL_TEXTURE2);
+
+    glBindTexture(GL_TEXTURE_2D, texture2);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img_width3, img_height3, 0, GL_RGBA, GL_UNSIGNED_BYTE, tex_bytes2);
+
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    stbi_image_free(tex_bytes2);
+    //additional texure end
+
 
     //lighting
-    glm::vec3 lightPos = glm::vec3(-10, 3, 0);
+    glm::vec3 lightPos = glm::vec3(-8, 3, 0);
     glm::vec3 lightColor = glm::vec3(1, 1, 1);
 
     float ambientStr = 0.1f;
@@ -665,6 +638,8 @@ int main(void)
 
         transformation_matrix = glm::rotate(transformation_matrix, glm::radians(ry_mod), glm::normalize(glm::vec3(axis_y, axis_x, axis_z)));
 
+        transformation_matrix = glm::rotate(transformation_matrix, glm::radians(rz_mod), glm::normalize(glm::vec3(axis_z, axis_x, axis_y)));
+
         unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
 
@@ -681,12 +656,22 @@ int main(void)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glUniform1i(tex0Address, 0);
 
+        glActiveTexture(GL_TEXTURE2);
+        GLuint tex2Address = glGetUniformLocation(shaderProgram, "newtex");
+        glBindTexture(GL_TEXTURE_2D, texture2);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glUniform1i(tex2Address, 2);
+
         glActiveTexture(GL_TEXTURE1);
         GLuint tex1Address = glGetUniformLocation(shaderProgram, "norm_tex");
         glBindTexture(GL_TEXTURE_2D, normtexture);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glUniform1i(tex1Address, 1);
+
+        
+        
 
         GLuint lightAddress = glGetUniformLocation(shaderProgram, "lightPos");
         glUniform3fv(lightAddress, 1, glm::value_ptr(lightPos));
