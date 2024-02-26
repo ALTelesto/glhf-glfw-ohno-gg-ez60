@@ -1,0 +1,32 @@
+# Blender 3.5.1 MTL File: 'None'
+# www.blender.org
+
+newmtl 01_-_Default
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd t1.jpg
+
+newmtl Material_#5
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd C:/Users/Komponents_For_Desing/СТАРОЕ/Моё Старое/3DS MAX Мои Работы/Sherman M4A3 105mm/Фидбек_к_модели/tz_model_object/4abd7b54 copy.jpg
+
+newmtl Material_#6
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd C:/Users/Komponents_For_Desing/СТАРОЕ/Моё Старое/3DS MAX Мои Работы/Sherman M4A3 105mm/Фидбек_к_модели/tz_model_object/4abd7b54 copy.jpg

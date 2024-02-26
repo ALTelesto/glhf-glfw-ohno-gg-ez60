@@ -265,7 +265,7 @@ int main(void)
 
     //3d model
 
-    std::string path = "3D/peanut.obj";
+    std::string path = "3D/Ozelot.obj";
     std::vector<tinyobj::shape_t> shape;
     std::vector<tinyobj::material_t> material;
     std::string warning, error;
@@ -407,7 +407,7 @@ int main(void)
     int img_width, img_height, colorChannels;
 
     stbi_set_flip_vertically_on_load(true);
-    unsigned char* tex_bytes = stbi_load("3D/brickwall.jpg", &img_width, &img_height, &colorChannels, 0);
+    unsigned char* tex_bytes = stbi_load("3D/Ozelot.jpg", &img_width, &img_height, &colorChannels, 0);
 
     GLuint texture;
 
